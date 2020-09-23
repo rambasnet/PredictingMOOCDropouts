@@ -131,3 +131,5 @@ dmypy.json
 data/
 cluster/
 .DS_Store
+*.zip
+kddcup15/
