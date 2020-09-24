@@ -1,7 +1,6 @@
 # Predicting Dropouts in MOOC
 
 ML and DL applications to predicting MOOC dropouts
-test
 ## References
 
 - The datasets: [http://moocdata.cn/data/user-activity](http://moocdata.cn/data/user-activity) 
