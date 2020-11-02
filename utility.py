@@ -6,7 +6,7 @@ import pandas as pd
 # Additional Scikit-Learn imports
 from sklearn.model_selection import StratifiedKFold
 
-# Scikit-Learn's ML models
+# Scikit-Learn's ML classifiers
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
@@ -20,10 +20,12 @@ from xgboost import XGBClassifier
 # Additional Metrics
 from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score, f1_score
 
-# Fast.ai DNN Model
-from fastai.tabular import *
+# fast.ai v1
+# from fastai.tabular import *
+# Fast.ai v2 DNN Classifer
+from fastai.tabular.all import *
 
-# Keras DNN Model
+# Keras DNN Classifier
 from keras.models import Sequential
 from keras.layers import BatchNormalization, Dense, Dropout
 from keras.regularizers import l2
@@ -33,7 +35,7 @@ from keras import backend as K
 # Fast.ai DNN Model
 from fastai.tabular import *
 
-# Objects used to help manage the metrics data
+# Class used to help manage the classifier performance metrics
 class Metric:
     def __init__(self, name, fold):
         self.name = name
@@ -180,7 +182,7 @@ class MetricsManager:
                 print('\n', end='')
 
 def model_eval(model, model_name, fold, X_train, X_test, Y_train, Y_test, metrics_manager):
-      print(f'fitting model: {model_name}')
+      print(f'Training and evaulating model: {model_name}')
       model.fit(X_train, Y_train)
 
       y_pred = model.predict(X_test)
@@ -200,11 +202,11 @@ def model_eval(model, model_name, fold, X_train, X_test, Y_train, Y_test, metric
       metrics_manager.addMetric(m)
 
 
-def train_and_eval_on_ML(X, y, feature_set, metrics_manager, fold=5):
-    """
-    train_and_eval_on function
+def train_and_eval_ML(X_train, X_test, y_train, y_test, metrics_manager, fold, quick_test=False):
+    """ Train and evulate Traditional ML classifiers from sci-kit learn
+
         Description: This function will train all the models on the given feature set of the X (data) for predicting y (target) and add the acquired metrics 
-          to the MetricsManager object from the user
+        to the MetricsManager object from the user
 
         Args: 
             X => pd.DataFrame object containing the data
@@ -213,9 +215,9 @@ def train_and_eval_on_ML(X, y, feature_set, metrics_manager, fold=5):
             metrics_manager => MetricsManager object (custom)
 
         Returns:
-            Nothing
+            None
         
-        Keys used for the manager:
+        Classifer names used as keys for the manager:
                         XGBoost Classifier => xgb
                         Random Forest => rf
                         Decision Tree => dt
@@ -225,132 +227,214 @@ def train_and_eval_on_ML(X, y, feature_set, metrics_manager, fold=5):
                         Linear Discriminant Analysis => lda
                         AdaBoost => ab
                         Naive Bayes => nb
-                        Keras-TensorFlow => keras
-                        Fast.ai => fastai
+
+    """
+    random_state = 100
+    if quick_test:
+        # Random Forest Model
+        rf = RandomForestClassifier(random_state=random_state)
+        model_eval(rf, 'rf', fold, X_train, X_test, y_train, y_test, metrics_manager)
+
+        # XGBoost Classifier
+        xgb = XGBClassifier()
+        model_eval(xgb, 'xgb', fold, X_train, X_test, y_train, y_test, metrics_manager)
+        return
+
+    # Random Forest Model
+    rf = RandomForestClassifier(random_state=random_state)
+    model_eval(rf, 'rf', fold, X_train, X_test, y_train, y_test, metrics_manager)
+
+    # XGBoost Classifier
+    xgb = XGBClassifier()
+    model_eval(xgb, 'xgb', fold, X_train, X_test, y_train, y_test, metrics_manager)
+
+    # AdaBoost Model
+    ab = AdaBoostClassifier(random_state=random_state)
+    model_eval(ab, 'ab', fold, X_train, X_test, y_train, y_test, metrics_manager)
+    
+    # Decision Tree Model
+    dt = DecisionTreeClassifier(random_state=random_state)
+    model_eval(dt, 'dt', fold, X_train, X_test, y_train, y_test, metrics_manager)
+
+    # k-Nearest Neighbors Model
+    knn = KNeighborsClassifier()
+    model_eval(knn, 'knn', fold, X_train, X_test, y_train, y_test, metrics_manager)
+
+    # Support Vector Machine Model
+    svm = SVC(random_state=random_state)
+    model_eval(svm, 'svm', fold, X_train, X_test, y_train, y_test, metrics_manager)
+
+    # Logistic Regression Model
+    lr = LogisticRegression(random_state=random_state)
+    model_eval(lr, 'lr', fold, X_train, X_test, y_train, y_test, metrics_manager)
+
+    # Linear Discriminant Analysis Model
+    lda = LinearDiscriminantAnalysis()
+    model_eval(lda, 'lda', fold, X_train, X_test, y_train, y_test, metrics_manager)
+
+    # Naive Bayes Model
+    nb = GaussianNB()
+    model_eval(nb, 'nb', fold, X_train, X_test, y_train, y_test, metrics_manager)
+
+def train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_set, metrics_manager, fold):
+    """ Train and Evaulate Deep Neural Networks
+
+    Args:
+    df => pandas dataframe
+    fold => n-fold cross validation
+    
+    Classifier names used as key in metrics_manager
+        Keras-TensorFlow => keras
+        Fast.ai => fastai
+    Returns:
+    None
     """
 
-    # Select the given features within the data
+    # Keras-TensorFlow DNN Model
+    print('Training and Evaluating Tensoflow...')
+    dnn_keras = Sequential(layers=[
+                                Dense(128, kernel_regularizer=l2(0.001), activation='relu',input_shape=(len(X_train.columns),)),
+                                BatchNormalization(),
+                                Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
+                                BatchNormalization(),
+                                Dense(y_train.nunique(), activation='softmax')
+    ])
+    dnn_keras.compile(
+        optimizer='adam', 
+        loss='categorical_crossentropy', 
+        metrics=['accuracy']) #, f1_m, precision_m, recall_m])
+    dnn_keras.fit(X_train, pd.get_dummies(y_train), epochs=100, verbose=0, batch_size=512)
+    loss, acc = dnn_keras.evaluate(X_test, pd.get_dummies(y_test), verbose=0)
+    
+    # extremely slow!
+    #loss, acc, f1, precision, recall = dnn_keras.evaluate(X_test, pd.get_dummies(y_test), verbose=0)
+    #print(loss, accuracy, f1, precision, recall)
+    #return
+    m = Metric('keras', fold=fold)
+    m.addValue('acc', 100*acc)
+    #m.addValue('rec', 100*recall)
+    #m.addValue('prec', 100*precision)
+    #m.addValue('f1', 100*f1)
+    metrics_manager.addMetric(m)
+    # Fast.ai DNN Model, v.1
+    """
+    data_fold = (TabularList.from_df(df, path=path, cont_names=X_train.columns, procs=[Categorify, Normalize])
+                    .split_by_idxs(train_idx, test_idx)
+                    .label_from_df(cols=dep_var)
+                    .databunch(num_workers=0))
+    dnn_fastai = tabular_learner(data_fold, layers=[200, 100], metrics=accuracy)
+    dnn_fastai.fit_one_cycle(cyc_len=10, callbacks=None)
+    _, score = dnn_fastai.validate()
+    """
+
+    # Fast.ai DNN Model, v.2
+    print('Training and Evaluating Fast.ai...')
+    splits = RandomSplitter(valid_pct=0.2)(range_of(df))
+    to = TabularPandas(df, procs=[Categorify, FillMissing, Normalize],
+                        cat_names= [],
+                        cont_names = feature_set,
+                        y_names=['label'], #y_names,
+                        splits=splits)
+    dls = to.dataloaders(bs=64)
+    dnn_fastai = tabular_learner(dls, metrics=accuracy)
+    dnn_fastai.fit_one_cycle(cyc_len=10, callbacks=None)
+
+    # acquire predictions
+    y_pred = []
+    #print('Length of test set: {}'.format(len(y_test)))
+    for j in range(len(y_test)):
+        row, clas, probs = dnn_fastai.predict(X_test.iloc[j])
+        #print(clas)
+        pred = 0
+        if clas == tensor(1):
+            pred = 1
+        y_pred.append(pred)
+        """actual = y_test.iloc[i]
+        if pred == actual:
+            print('Correct!')
+        else:
+            print('Incorrect!')
+        print('Prediction: {}'.format(pred))
+        print('Actual: {}'.format(actual))
+        print('-'*20)"""
+
+    acc = accuracy_score(y_test, y_pred)
+    rec = recall_score(y_test, y_pred, average='weighted')
+    prec = precision_score(y_test, y_pred, average='weighted')
+    #auc = auc_roc_score(y_test, y_pred)
+    #f1 = f1_score(y_test, y_pred)
+
+    m = Metric('fastai', fold=fold)
+    m.addValue('acc', 100*acc)
+    m.addValue('rec', 100*rec)
+    m.addValue('prec', 100*prec)
+    #m.addValue('auc', 100*auc)
+    #m.addValue('f1', 100*f1)
+    metrics_manager.addMetric(m)
+
+
+
+def train_and_eval(df, X, y, feature_set, y_names, metrics_manager, fold=5, quick_test=False):
+    """Train and Eval wrapper function
+
+    Args:
+    df => pandas dataframe
+    X => dataset
+    y => truth
+    featur_set => set of feature names
+
+    Returns:
+    None
+    """
+
+    if quick_test:
+        fold = 2
+
     X = X[feature_set]
 
-    print('Training with {} features'.format(len(X.columns)))
+    print(f'Running {fold}-fold cross validation evaluation')
+    print(f'Training with {len(X.columns)} features')
 
-    # Create stratified, 10-fold cross validation object
-    random_state = 0
+    random_state=100
+
+    # Create stratified, n-fold cross validation object
     sss = StratifiedKFold(n_splits=fold, shuffle=True, random_state=random_state)
 
     i=1
 
     # Experiment with n-fold cross validation
+
     for train_idx, test_idx in sss.split(X, y):
 
-        print('fold num {}'.format(i))
+        print(f'fold num {i}')
 
         # Split the data into the training and testing sets
         X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
         y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
-        
-        # Random Forest Model
-        rf = RandomForestClassifier(random_state=random_state)
-        model_eval(rf, 'rf', i, X_train, X_test, y_train, y_test, metrics_manager)
 
-        # XGBoost Classifier
-        xgb = XGBClassifier()
-        model_eval(xgb, 'xgb', i, X_train, X_test, y_train, y_test, metrics_manager)
+        train_and_eval_ML(X_train, X_test, y_train, y_test, metrics_manager, i, quick_test)
+        train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_set, metrics_manager, i)
 
-        # AdaBoost Model
-        ab = AdaBoostClassifier(random_state=random_state)
-        model_eval(ab, 'ab', i, X_train, X_test, y_train, y_test, metrics_manager)
-      
-        # Decision Tree Model
-        dt = DecisionTreeClassifier(random_state=random_state)
-        model_eval(dt, 'dt', i, X_train, X_test, y_train, y_test, metrics_manager)
+        i += 1
 
-        # k-Nearest Neighbors Model
-        knn = KNeighborsClassifier()
-        model_eval(knn, 'knn', i, X_train, X_test, y_train, y_test, metrics_manager)
 
-        # Support Vector Machine Model
-        svm = SVC(random_state=random_state)
-        model_eval(svm, 'svm', i, X_train, X_test, y_train, y_test, metrics_manager)
+def KDDExperiments():
+    path = 'data/kddcup15'
+    db_path = os.path.join(path, 'kdd_all_normalized_features.csv')
+    df = pd.read_csv(db_path)
+    # Features that could lead to overfitting the models
+    bad_features = ['enrollment_id']
+    df.drop(labels=bad_features, axis='columns', inplace=True)
+    dep_var = 'truth'
+    X = df.loc[:, df.columns != dep_var]
+    y = df[dep_var]
+    mm = MetricsManager()
+    fold = 5
+    quick_test = True
+    y_names = ['truth']
+    train_and_eval(df, X, y, X.columns, y_names, mm, fold, quick_test)
+    mm.printMeasures()
 
-        # Logistic Regression Model
-        lr = LogisticRegression(random_state=random_state)
-        model_eval(lr, 'lr', i, X_train, X_test, y_train, y_test, metrics_manager)
 
-        # Linear Discriminant Analysis Model
-        lda = LinearDiscriminantAnalysis()
-        model_eval(lda, 'lda', i, X_train, X_test, y_train, y_test, metrics_manager)
-
-        # Naive Bayes Model
-        nb = GaussianNB()
-        model_eval(nb, 'nb', i, X_train, X_test, y_train, y_test, metrics_manager)
-
-        # Keras-TensorFlow DNN Model
-        dnn_keras = Sequential(layers=[
-                                 Dense(128, kernel_regularizer=l2(0.001), activation='relu',input_shape=(len(X_train.columns),)),
-                                 BatchNormalization(),
-                                 Dense(64, activation='relu', kernel_regularizer=l2(0.001)),
-                                 BatchNormalization(),
-                                 Dense(y_train.nunique(), activation='softmax')
-        ])
-        dnn_keras.compile(
-            optimizer='adam', 
-            loss='categorical_crossentropy', 
-            metrics=['accuracy']) #, f1_m, precision_m, recall_m])
-        dnn_keras.fit(X_train, pd.get_dummies(y_train), epochs=100, verbose=0, batch_size=512)
-        loss, acc = dnn_keras.evaluate(X_test, pd.get_dummies(y_test), verbose=0)
-        
-        # extremely slow!
-        #loss, acc, f1, precision, recall = dnn_keras.evaluate(X_test, pd.get_dummies(y_test), verbose=0)
-        #print(loss, accuracy, f1, precision, recall)
-        #return
-        m = Metric('keras', fold=i)
-        m.addValue('acc', 100*acc)
-        #m.addValue('rec', 100*recall)
-        #m.addValue('prec', 100*precision)
-        #m.addValue('f1', 100*f1)
-        mm.addMetric(m)
-
-        # Fast.ai DNN Model
-        data_fold = (TabularList.from_df(df, path=path, cont_names=X_train.columns, procs=[Categorify, Normalize])
-                     .split_by_idxs(train_idx, test_idx)
-                     .label_from_df(cols=dep_var)
-                     .databunch(num_workers=0))
-        dnn_fastai = tabular_learner(data_fold, layers=[200, 100], metrics=accuracy)
-        dnn_fastai.fit_one_cycle(cyc_len=10, callbacks=None)
-        _, score = dnn_fastai.validate()
-
-        # acquire predictions
-        y_pred = []
-        #print('Length of test set: {}'.format(len(y_test)))
-        for j in range(len(y_test)):
-            row, clas, probs = dnn_fastai.predict(X_test.iloc[j])
-            #print(clas)
-            pred = 0
-            if clas == tensor(1):
-                pred = 1
-            y_pred.append(pred)
-            """actual = y_test.iloc[i]
-            if pred == actual:
-                print('Correct!')
-            else:
-                print('Incorrect!')
-            print('Prediction: {}'.format(pred))
-            print('Actual: {}'.format(actual))
-            print('-'*20)"""
-
-        acc = accuracy_score(y_test, y_pred)
-        rec = recall_score(y_test, y_pred, average='weighted')
-        prec = precision_score(y_test, y_pred, average='weighted')
-        #auc = auc_roc_score(y_test, y_pred)
-        #f1 = f1_score(y_test, y_pred)
-
-        m = Metric('fastai', fold=i)
-        m.addValue('acc', 100*acc)
-        m.addValue('rec', 100*rec)
-        m.addValue('prec', 100*prec)
-        #m.addValue('auc', 100*auc)
-        #m.addValue('f1', 100*f1)
-        mm.addMetric(m)
-
-        i+=1
+if __name__ == "__main__":
+    KDDExperiments()

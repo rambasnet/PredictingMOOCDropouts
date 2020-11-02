@@ -1,0 +1,10 @@
+model pairs    model1    mean1        std1  model2      mean2     std2    t-stat    p-val  sig/notsig
+-------------  --------  --------  -------  --------  -------  -------  --------  -------  ------------
+rf v xgb       xgb       0.87560*  0.00299  rf        0.87552  0.00307   nan      nan      notsig
+xgb v ab       ab        0.87636*  0.00298  xgb       0.8756   0.00299   nan      nan      notsig
+ab v dt        ab        0.87636*  0.00298  dt        0.80623  0.00341    24.849    0      sig
+ab v knn       ab        0.87636*  0.00298  knn       0.8543   0.00265    15.793    0      sig
+ab v svm       ab        0.87636*  0.00298  svm       0.87199  0.00265     5.386    0.003  sig
+ab v lr        ab        0.87636*  0.00298  lr        0.87282  0.00271     4.101    0.009  sig
+ab v lda       ab        0.87636*  0.00298  lda       0.86984  0.00313     7.141    0.001  sig
+ab v nb        ab        0.87636*  0.00298  nb        0.85063  0.00209    19.204    0      sig
