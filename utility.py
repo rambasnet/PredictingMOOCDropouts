@@ -32,8 +32,6 @@ from keras.regularizers import l2
 from keras.utils import to_categorical, normalize
 from keras import backend as K
 
-# Fast.ai DNN Model
-from fastai.tabular import *
 
 # Class used to help manage the classifier performance metrics
 class Metric:
@@ -290,8 +288,9 @@ def train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_se
     None
     """
 
+
     # Keras-TensorFlow DNN Model
-    print('Training and Evaluating Tensoflow...')
+    print('Training and Evaluating Keras-Tensoflow...')
     dnn_keras = Sequential(layers=[
                                 Dense(128, kernel_regularizer=l2(0.001), activation='relu',input_shape=(len(X_train.columns),)),
                                 BatchNormalization(),
@@ -301,41 +300,42 @@ def train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_se
     ])
     dnn_keras.compile(
         optimizer='adam', 
-        loss='categorical_crossentropy', 
-        metrics=['accuracy']) #, f1_m, precision_m, recall_m])
-    dnn_keras.fit(X_train, pd.get_dummies(y_train), epochs=100, verbose=0, batch_size=512)
-    loss, acc = dnn_keras.evaluate(X_test, pd.get_dummies(y_test), verbose=0)
+        loss='binary_crossentropy')
     
-    # extremely slow!
-    #loss, acc, f1, precision, recall = dnn_keras.evaluate(X_test, pd.get_dummies(y_test), verbose=0)
-    #print(loss, accuracy, f1, precision, recall)
-    #return
-    m = Metric('keras', fold=fold)
+    dnn_keras.fit(X_train, pd.get_dummies(y_train), epochs=100, verbose=0, batch_size=512)
+    #loss, acc = dnn_keras.evaluate(X_test, pd.get_dummies(y_test), verbose=0)
+    y_pred = dnn_keras.predict_classes(X_test)
+    
+    acc = accuracy_score(y_test, y_pred)
+    rec = recall_score(y_test, y_pred, average='weighted')
+    prec = precision_score(y_test, y_pred, average='weighted')
+    auc = roc_auc_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
+
+    m = Metric('Keras-Tensorflow', fold=fold)
     m.addValue('acc', 100*acc)
-    #m.addValue('rec', 100*recall)
-    #m.addValue('prec', 100*precision)
-    #m.addValue('f1', 100*f1)
+    m.addValue('rec', 100*rec)
+    m.addValue('prec', 100*prec)
+    m.addValue('auc', 100*auc)
+    m.addValue('f1', 100*f1)
     metrics_manager.addMetric(m)
-    # Fast.ai DNN Model, v.1
-    """
-    data_fold = (TabularList.from_df(df, path=path, cont_names=X_train.columns, procs=[Categorify, Normalize])
-                    .split_by_idxs(train_idx, test_idx)
-                    .label_from_df(cols=dep_var)
-                    .databunch(num_workers=0))
-    dnn_fastai = tabular_learner(data_fold, layers=[200, 100], metrics=accuracy)
-    dnn_fastai.fit_one_cycle(cyc_len=10, callbacks=None)
-    _, score = dnn_fastai.validate()
-    """
+    metrics_manager.printMeasures()
+
 
     # Fast.ai DNN Model, v.2
     print('Training and Evaluating Fast.ai...')
-    splits = RandomSplitter(valid_pct=0.2)(range_of(df))
-    to = TabularPandas(df, procs=[Categorify, FillMissing, Normalize],
+    splits = RandomSplitter(valid_pct=0.2)(range_of(X_train))
+    #print(feature_set)
+    #print(df[:5])
+    tp = TabularPandas(df, procs=[],
                         cat_names= [],
-                        cont_names = feature_set,
-                        y_names=['label'], #y_names,
+                        cont_names = list(feature_set),
+                        y_names= y_names,
                         splits=splits)
-    dls = to.dataloaders(bs=64)
+    print('here')
+    dls = tp.dataloaders(bs=64)
+    #dls.show_batch()
+    #return
     dnn_fastai = tabular_learner(dls, metrics=accuracy)
     dnn_fastai.fit_one_cycle(cyc_len=10, callbacks=None)
 
@@ -349,27 +349,19 @@ def train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_se
         if clas == tensor(1):
             pred = 1
         y_pred.append(pred)
-        """actual = y_test.iloc[i]
-        if pred == actual:
-            print('Correct!')
-        else:
-            print('Incorrect!')
-        print('Prediction: {}'.format(pred))
-        print('Actual: {}'.format(actual))
-        print('-'*20)"""
 
     acc = accuracy_score(y_test, y_pred)
     rec = recall_score(y_test, y_pred, average='weighted')
     prec = precision_score(y_test, y_pred, average='weighted')
-    #auc = auc_roc_score(y_test, y_pred)
-    #f1 = f1_score(y_test, y_pred)
+    auc = roc_auc_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
 
     m = Metric('fastai', fold=fold)
     m.addValue('acc', 100*acc)
     m.addValue('rec', 100*rec)
     m.addValue('prec', 100*prec)
-    #m.addValue('auc', 100*auc)
-    #m.addValue('f1', 100*f1)
+    m.addValue('auc', 100*auc)
+    m.addValue('f1', 100*f1)
     metrics_manager.addMetric(m)
 
 
@@ -412,13 +404,15 @@ def train_and_eval(df, X, y, feature_set, y_names, metrics_manager, fold=5, quic
         X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
         y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-        train_and_eval_ML(X_train, X_test, y_train, y_test, metrics_manager, i, quick_test)
+        #train_and_eval_ML(X_train, X_test, y_train, y_test, metrics_manager, i, quick_test)
+        # train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_set, metrics_manager, fold)
         train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_set, metrics_manager, i)
 
         i += 1
 
 
 def KDDExperiments():
+    print('DL Experiments on KDD-cup15 Dataset')
     path = 'data/kddcup15'
     db_path = os.path.join(path, 'kdd_all_normalized_features.csv')
     df = pd.read_csv(db_path)
@@ -430,11 +424,36 @@ def KDDExperiments():
     y = df[dep_var]
     mm = MetricsManager()
     fold = 5
-    quick_test = True
-    y_names = ['truth']
-    train_and_eval(df, X, y, X.columns, y_names, mm, fold, quick_test)
+    #quick_test = True
+    #y_names = ['truth']
+    # train_and_eval(df, X, y, feature_set, y_names, metrics_manager, fold=5, quick_test=False)
+    train_and_eval(df, X, y, X.columns, dep_var, mm, fold, quick_test)
     mm.printMeasures()
 
+def XeutantxExperiments():
+    pass
+
+def KDDStanford():
+    print('DL Experiments Stanford KDD-cup15 Dataset')
+    path = 'data/stanford'
+    db_path = os.path.join(path, 'normalized_all_features.csv')
+    df = pd.read_csv(db_path, index_col=0)
+    # Features that could lead to overfitting the models
+    bad_features = ['enrollment_id']
+    df.drop(labels=bad_features, axis='columns', inplace=True)
+    dep_var = 'label'
+    X = df.loc[:, df.columns != dep_var]
+    y = df[dep_var]
+
+    mm = MetricsManager()
+    fold = 5
+    #quick_test = True
+    #y_names = ['truth']
+    # train_and_eval(df, X, y, feature_set, y_names, metrics_manager, fold=5, quick_test=False)
+    train_and_eval(df, X, y, X.columns, dep_var, mm, fold, quick_test)
+    mm.printMeasures()
+    
 
 if __name__ == "__main__":
-    KDDExperiments()
+    #KDDExperiments()
+    KDDStanford()
