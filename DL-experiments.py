@@ -18,7 +18,7 @@ from sklearn.naive_bayes import GaussianNB
 from xgboost import XGBClassifier
 
 # Additional Metrics
-from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score, f1_score
+from sklearn.metrics import balanced_accuracy_score, accuracy_score, precision_score, recall_score, roc_auc_score, f1_score
 
 # fast.ai v1
 # from fastai.tabular import *
@@ -288,7 +288,6 @@ def train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_se
     None
     """
 
-
     # Keras-TensorFlow DNN Model
     print('Training and Evaluating Keras-Tensoflow...')
     dnn_keras = Sequential(layers=[
@@ -307,6 +306,7 @@ def train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_se
     y_pred = dnn_keras.predict_classes(X_test)
     
     acc = accuracy_score(y_test, y_pred)
+    bal_acc = balanced_accuracy_score(y_test, y_pred)
     rec = recall_score(y_test, y_pred, average='weighted')
     prec = precision_score(y_test, y_pred, average='weighted')
     auc = roc_auc_score(y_test, y_pred)
@@ -314,13 +314,13 @@ def train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_se
 
     m = Metric('Keras-Tensorflow', fold=fold)
     m.addValue('acc', 100*acc)
+    m.addValue('bal-acc', 100*bal_acc)
     m.addValue('rec', 100*rec)
     m.addValue('prec', 100*prec)
     m.addValue('auc', 100*auc)
     m.addValue('f1', 100*f1)
     metrics_manager.addMetric(m)
     metrics_manager.printMeasures()
-
 
     # Fast.ai DNN Model, v.2
     print('Training and Evaluating Fast.ai...')
@@ -332,12 +332,12 @@ def train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_se
                         cont_names = list(feature_set),
                         y_names= y_names,
                         splits=splits)
-    print('here')
+
     dls = tp.dataloaders(bs=64)
     #dls.show_batch()
     #return
     dnn_fastai = tabular_learner(dls, metrics=accuracy)
-    dnn_fastai.fit_one_cycle(cyc_len=10, callbacks=None)
+    dnn_fastai.fit_one_cycle(5)
 
     # acquire predictions
     y_pred = []
@@ -346,11 +346,12 @@ def train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_se
         row, clas, probs = dnn_fastai.predict(X_test.iloc[j])
         #print(clas)
         pred = 0
-        if clas == tensor(1):
+        if clas >= tensor(0.5):
             pred = 1
         y_pred.append(pred)
 
     acc = accuracy_score(y_test, y_pred)
+    bal_acc = balanced_accuracy_score(y_test, y_pred)
     rec = recall_score(y_test, y_pred, average='weighted')
     prec = precision_score(y_test, y_pred, average='weighted')
     auc = roc_auc_score(y_test, y_pred)
@@ -358,6 +359,7 @@ def train_and_eval_DNN(df, X_train, X_test, y_train, y_test, y_names, feature_se
 
     m = Metric('fastai', fold=fold)
     m.addValue('acc', 100*acc)
+    m.addValue('bal-acc', 100*bal_acc)
     m.addValue('rec', 100*rec)
     m.addValue('prec', 100*prec)
     m.addValue('auc', 100*auc)
@@ -430,8 +432,26 @@ def KDDExperiments():
     train_and_eval(df, X, y, X.columns, dep_var, mm, fold, quick_test)
     mm.printMeasures()
 
-def XeutantxExperiments():
-    pass
+def XeutangxExperiments():
+    path = 'data/xeutangx'
+    f_train = 'train_normalized_trimmed_features.csv'
+    df_train = pd.read_csv(os.path.join(path, f_train))
+    f_test = 'test_normalized_trimmed_features.csv'
+    df_test = pd.read_csv(os.path.join(path, f_test))
+    bad_features = ['enroll_id', 'username', 'course_id']
+    df_train.drop(labels=bad_features, axis='columns', inplace=True)
+    df_test.drop(labels=bad_features, axis='columns', inplace=True)
+    df = pd.concat([df_train, df_test])
+    dep_var = 'truth'
+    X = df.loc[:, df.columns != dep_var]
+    y = df[dep_var]
+    mm = MetricsManager()
+    fold = 5
+    quick_test = False
+    #y_names = ['truth']
+    # train_and_eval(df, X, y, feature_set, y_names, metrics_manager, fold=5, quick_test=False)
+    train_and_eval(df, X, y, X.columns, dep_var, mm, fold, quick_test)
+    mm.printMeasures()
 
 def KDDStanford():
     print('DL Experiments Stanford KDD-cup15 Dataset')
@@ -447,7 +467,7 @@ def KDDStanford():
 
     mm = MetricsManager()
     fold = 5
-    quick_test = True
+    quick_test = False
     #y_names = ['truth']
     # train_and_eval(df, X, y, feature_set, y_names, metrics_manager, fold=5, quick_test=False)
     train_and_eval(df, X, y, X.columns, dep_var, mm, fold, quick_test)
@@ -456,4 +476,5 @@ def KDDStanford():
 
 if __name__ == "__main__":
     #KDDExperiments()
-    KDDStanford()
+    #KDDStanford()
+    XeutangxExperiments()

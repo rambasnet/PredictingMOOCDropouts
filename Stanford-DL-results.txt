@@ -1,0 +1,6 @@
+DL Experiments Stanford KDD-cup15 Dataset
+
+model     acc        rec        prec       auc        f1         
+------------------------------------------
+Keras-Tensorflow 85.03±0.23 85.03±0.23 84.08±0.20 72.99±0.03 90.84±0.16
+FastAI fastai    87.52±0.13 87.52±0.13 86.86±0.13 75.50±0.59 92.43±0.06
